@@ -7,7 +7,7 @@ namespace  {
 }
 
 namespace bq34110 {
-    constexpr int8_t selfAddress = 0b1010101;
+    constexpr int8_t selfAddress = 0xAA;
     namespace cmnd {
         constexpr uint8_t CNTRL = 0x00;       //0x00 and 0x01, unit NA (access R/W)
         constexpr uint8_t TEMP = 0x06;        //0x06 and 0x07, unit 0.1K (access R)
@@ -31,8 +31,10 @@ namespace bq34110 {
         constexpr uint8_t CHC = 0x32;            //0x32 and 0x33, unit mA (access R) Charging Current
         constexpr uint8_t DESCAP = 0x3C;        //0x3C and 0x3D, unit mAh (access R) Design Capacity
         
-        constexpr uint8_t MAC = 0x28;           //0x3E and 0x3F, unit 0.1K (access R/W) Manufacturer Access Control
+        constexpr uint8_t MAC = 0x3E;           //0x3E and 0x3F, (access R/W) Manufacturer Access Control
         constexpr uint8_t MACDAT = 0x40;        //0x40 through 0x5F, (access R/W) MACData
+        constexpr uint8_t MACDATSUM = 0x60;        //0x40 through 0x5F, (access R/W) MACData
+        constexpr uint8_t MACDATLEN = 0x61;        //0x40 through 0x5F, (access R/W) MACData
         
         constexpr uint8_t EOSLERNSTAT = 0x64;   //0x64 and 0x65, (access R) EOSLearnStatus
         constexpr uint8_t EOSSTAT = 0x68;       //(access R) EOSStatus
@@ -55,6 +57,7 @@ namespace bq34110 {
          constexpr uint16_t EOS_WARNCLR = 0x003C;           //Clears the EOS Warning flags
          constexpr uint16_t EOS_INITIAL_RCELL = 0x003E;      //Used to read and write the EOS Initial Rcell value
          constexpr uint16_t EOS_INITIAL_RRATE = 0x003F;      //Used to read and write the EOS Initial RRate value
+         constexpr uint16_t RESET = 0x0041;                 //Resets device
          constexpr uint16_t EOS_LOAD_ON = 0x0044;           //Turns on the learning load
          constexpr uint16_t EOS_LOAD_OFF = 0x0045;          //Turns off the learning load
          constexpr uint16_t DEVICE_NAME = 0x004A;          //This MAC subcommand returns the device name
@@ -63,9 +66,16 @@ namespace bq34110 {
     }
     class bq34 {
         public:
-            uint16_t getCommandData(uint8_t cmnCode);
+            bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
+            bool getSubCommandData(uint8_t cmnCode, uint16_t subCmnd, uint16_t& data);
+            bool gaugeControlSubCmnd (uint16_t subCmnd);
+            bool reset();
+            bool gaugeReadDataClass(uint8_t subClass, uint8_t *pData, uint8_t dataLen);
+            bool gaugeWriteDataClass(uint16_t subClass, uint8_t *pData, uint8_t dataLen);
+            bool operationConfigA();
         private:
-
+            bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
+            bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
     };
 
 }

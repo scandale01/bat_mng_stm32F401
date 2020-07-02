@@ -48,6 +48,8 @@
 
 /* USER CODE BEGIN PV */
 	bq34110::bq34 bq;
+	uint16_t dataRead;
+	uint16_t gpioFlag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,7 +62,7 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN 0 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if(GPIO_Pin == B1_Pin) {
-		auto dataRead = bq.getCommandData(bq34110::cmnd::CNTRL);
+	  gpioFlag = 1;
 	}
 }
 /* USER CODE END 0 */
@@ -103,6 +105,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    if(gpioFlag == 1) {
+      uint16_t dataRead;
+      bq.getSubCommandData(bq34110::cmnd::CNTRL, bq34110::subcmnd::FW_VERSION, dataRead);
+      gpioFlag = 0;
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

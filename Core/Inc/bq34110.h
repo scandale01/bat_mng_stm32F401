@@ -66,13 +66,15 @@ namespace bq34110 {
     }
     class bq34 {
         public:
-            bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
-            bool getSubCommandData(uint8_t cmnCode, uint16_t subCmnd, uint16_t& data);
-            bool gaugeControlSubCmnd (uint16_t subCmnd);
-            bool reset();
-            bool gaugeReadDataClass(uint8_t subClass, uint8_t *pData, uint8_t dataLen);
-            bool gaugeWriteDataClass(uint16_t subClass, uint8_t *pData, uint8_t dataLen);
-            bool operationConfigA();
+          bool init();
+          bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
+          bool getSubCommandData(uint8_t cmnCode, uint16_t subCmnd, uint16_t& data);
+          bool gaugeControlSubCmnd (uint16_t subCmnd);
+          bool reset();
+          bool gaugeReadDataClass(uint8_t subClass, uint8_t *pData, uint8_t dataLen);
+          bool gaugeWriteDataClass(uint16_t subClass, uint8_t *pData, uint8_t dataLen);
+          bool operationConfigA();
+          bool CEDVConfig();
         private:
             bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
             bool gaugeWrite(uint8_t *pData, uint8_t dataLen);

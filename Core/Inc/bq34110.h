@@ -8,6 +8,13 @@ namespace  {
 
 namespace bq34110 {
     constexpr int8_t selfAddress = 0xAA;
+
+    struct sysParam{
+      uint16_t capacity = 17000; //mAh
+      uint16_t systemVoltage = 24000; //mV
+      uint8_t configType = 1;
+      uint8_t capacScale = 1;
+    };
     namespace cmnd {
         constexpr uint8_t CNTRL = 0x00;       //0x00 and 0x01, unit NA (access R/W)
         constexpr uint8_t TEMP = 0x06;        //0x06 and 0x07, unit 0.1K (access R)
@@ -38,6 +45,7 @@ namespace bq34110 {
         
         constexpr uint8_t EOSLERNSTAT = 0x64;   //0x64 and 0x65, (access R) EOSLearnStatus
         constexpr uint8_t EOSSTAT = 0x68;       //(access R) EOSStatus
+        constexpr uint8_t ANALOG_COUNT = 0x79;    // returns the analog calibration counter
     }
     namespace subcmnd{
          constexpr uint16_t CONTROL_STATUS = 0x0000;    //Reports the status of key features. This command should be 
@@ -51,6 +59,9 @@ namespace bq34110 {
          constexpr uint16_t ACCUM_CHG_EN = 0x001F;      //Toggles the value of ManufacturingStatus()[ACCHG_EN]
          
          constexpr uint16_t EOS_EN = 0x0021;            //Toggles the value of ManufacturingStatus()[EOS_EN]
+
+         constexpr uint16_t CAL_TOGGLE = 0x002D;        //toggles the value of OperationStatus()[CALMD]
+
          constexpr uint16_t EOS_START_LEARN = 0x0039;   //Initiates an EOS learning phase
 
          constexpr uint16_t EOS_RCELL_RRATE_LEARN = 0x003B;   //Initiates the Initial Rcell and Initial RRate learning procedures
@@ -62,19 +73,25 @@ namespace bq34110 {
          constexpr uint16_t EOS_LOAD_OFF = 0x0045;          //Turns off the learning load
          constexpr uint16_t DEVICE_NAME = 0x004A;          //This MAC subcommand returns the device name
          constexpr uint16_t ACCUM_RESET = 0x004B;          //Resets the Accumulated Charge integration counter
+         constexpr uint16_t OPERAT_STATUS = 0x0054;          //This returns the same value as the OperationStatus() command
+         constexpr uint16_t GAUGING_STATUS = 0x0056;        //This MAC subcommand returns the information in the CEDV gauging status register
+         constexpr uint16_t MANUFACT_STATUS = 0x0057;       //This MAC subcommand returns the values of various functional modes of the device
 
     }
     class bq34 {
         public:
           bool init();
           bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
-          bool getSubCommandData(uint8_t cmnCode, uint16_t subCmnd, uint16_t& data);
+          bool getSubCommandData(uint8_t WCmnCode, uint16_t subCmnd, uint8_t RCmndCode, uint16_t& data);
           bool gaugeControlSubCmnd (uint16_t subCmnd);
           bool reset();
           bool gaugeReadDataClass(uint8_t subClass, uint8_t *pData, uint8_t dataLen);
           bool gaugeWriteDataClass(uint16_t subClass, uint8_t *pData, uint8_t dataLen);
           bool operationConfigA();
           bool CEDVConfig();
+          bool enterCalMode();
+          bool exitCalMode();
+          bool calibCCOffset();
         private:
             bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
             bool gaugeWrite(uint8_t *pData, uint8_t dataLen);

@@ -98,7 +98,8 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-
+  bq.init();
+  bq.enterCalMode();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,7 +108,7 @@ int main(void)
   {
     if(gpioFlag == 1) {
       uint16_t dataRead;
-      bq.getSubCommandData(bq34110::cmnd::CNTRL, bq34110::subcmnd::FW_VERSION, dataRead);
+      bq.getSubCommandData(bq34110::cmnd::CNTRL, bq34110::subcmnd::FW_VERSION, bq34110::cmnd::CNTRL, dataRead);
       gpioFlag = 0;
     }
     /* USER CODE END WHILE */

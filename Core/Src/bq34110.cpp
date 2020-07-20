@@ -4,12 +4,16 @@
 #include "stdio.h"
 
 namespace  {
+    uint8_t curCapScale = 2;
     uint8_t capInitPerScale = 50; //this scale % DOD voltage in 2 times
-    int32_t *voltageDOD = new int32_t[10];
+    int16_t *voltageDOD = new int16_t[10];
     void setConfigForInit()
     {
       //start flashing led
       //if no button is pressed during 5 sec, then config 1, if pressed 1 time - conf 2 and so on...
+      //if(btnPressed1 time) ...
+      //else
+
       capInitPerScale = 50;
 
       voltageDOD[0] = 22500; //45000mV (22.5 * capInitPerScale)
@@ -319,24 +323,64 @@ namespace bq34110 {
       return true;
     }
 
-    bool bq34::calibRawData()
+    bool bq34::calibRawCurr(uint16_t &currentVal)
     {
       uint16_t loopCount = 0;
       uint16_t rawDataSum = 0;
       uint8_t counterNow;
       uint8_t counterPrev;
-      if(!this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow))) {
-        return false;
-      }
-      counterPrev = counterNow;
-      HAL_Delay(200);
-      if (!this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow))) {
-        return false;
-      }
-      while(counterNow == counterPrev) {
+      //10 samples for averaging
+      for (; loopCount < 10; ++loopCount) {
+        if(!this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow))) {
+          return false;
+        }
+        counterPrev = counterNow;
         HAL_Delay(200);
-        this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow));
+        if (!this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow))) {
+          return false;
+        }
+        while(counterNow == counterPrev) {
+          HAL_Delay(200);
+          this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow));
+        }
+        uint16_t tempCurr;
+        if(!this->getStdCommandData(bq34110::cmnd::RAW_CURRENT, tempCurr))
+          return false;
+        rawDataSum += tempCurr;
+        counterPrev = counterNow;
       }
+      currentVal = (rawDataSum / 10) * curCapScale;
+      return true;
+    }
+
+    bool bq34::calibRawVoltage(uint16_t &voltagetVal)
+    {
+      uint16_t loopCount = 0;
+      uint16_t rawDataSum = 0;
+      uint8_t counterNow;
+      uint8_t counterPrev;
+      //10 samples for averaging
+      for (; loopCount < 10; ++loopCount) {
+        if(!this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow))) {
+          return false;
+        }
+        counterPrev = counterNow;
+        HAL_Delay(200);
+        if (!this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow))) {
+          return false;
+        }
+        while(counterNow == counterPrev) {
+          HAL_Delay(200);
+          this->gaugeRead(bq34110::cmnd::ANALOG_COUNT, &counterNow, sizeof(counterNow));
+        }
+        uint16_t tempVolt;
+        if(!this->getStdCommandData(bq34110::cmnd::RAW_VOLTAGE, tempVolt))
+          return false;
+        rawDataSum += tempVolt;
+        counterPrev = counterNow;
+      }
+      voltagetVal = (rawDataSum / 10);
+      return true;
     }
 
     bool bq34::gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen)

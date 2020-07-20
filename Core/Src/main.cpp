@@ -50,6 +50,8 @@
 	bq34110::bq34 bq;
 	uint16_t dataRead;
 	uint16_t gpioFlag = 0;
+	uint16_t calibCurtVal;
+	uint16_t calibVolttVal;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,6 +102,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
   bq.init();
   bq.enterCalMode();
+  if(!bq.calibRawCurr(calibCurtVal)) {
+//    Error_Handler();
+    calibCurtVal = 0;
+  }
+  if (!bq.calibRawVoltage(calibVolttVal)) {
+    calibVolttVal = 0;
+  }
+  bq.exitCalMode();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */

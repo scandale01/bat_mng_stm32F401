@@ -46,6 +46,9 @@ namespace bq34110 {
         constexpr uint8_t EOSLERNSTAT = 0x64;   //0x64 and 0x65, (access R) EOSLearnStatus
         constexpr uint8_t EOSSTAT = 0x68;       //(access R) EOSStatus
         constexpr uint8_t ANALOG_COUNT = 0x79;    // returns the analog calibration counter
+        constexpr uint8_t RAW_CURRENT = 0x7A;     //reads current at calibration
+        constexpr uint8_t RAW_VOLTAGE = 0x7C;     //reads voltage at calibration
+        constexpr uint8_t RAW_TEMP = 0x7E;        //reads temperature at calibration
     }
     namespace subcmnd{
          constexpr uint16_t CONTROL_STATUS = 0x0000;    //Reports the status of key features. This command should be 
@@ -92,6 +95,9 @@ namespace bq34110 {
           bool enterCalMode();
           bool exitCalMode();
           bool calibCCOffset();
+          bool calibBoardOffset();
+          bool calibRawCurr(uint16_t &currentVal);
+          bool calibRawVoltage(uint16_t &voltagetVal);
         private:
             bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
             bool gaugeWrite(uint8_t *pData, uint8_t dataLen);

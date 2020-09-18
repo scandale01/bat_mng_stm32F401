@@ -81,6 +81,15 @@ namespace bq34110 {
          constexpr uint16_t MANUFACT_STATUS = 0x0057;       //This MAC subcommand returns the values of various functional modes of the device
 
     }
+    namespace config {
+      struct conf {
+        uint16_t sysVoltage_mV;
+        uint16_t sysCapacity_mAh;
+        uint8_t lowCapAlert_prct;
+        uint8_t enExtTesting;
+        uint16_t testCyclePeriod_days;
+      };
+    }
     class bq34 {
         public:
           bool init();

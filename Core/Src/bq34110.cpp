@@ -108,6 +108,7 @@ namespace bq34110 {
       return true;
     }
 
+    //sets device is SEALED mode after reset
     bool bq34::reset()
     {
       uint8_t i2c_data[3];

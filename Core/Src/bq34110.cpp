@@ -4,28 +4,32 @@
 #include "stdio.h"
 
 namespace  {
-    uint8_t curCapScale = 2;
-    uint8_t capInitPerScale = 50; //this scale % DOD voltage in 2 times
+    uint8_t capScale = 2; //this scale % DOD voltage in 2 times
     int16_t *voltageDOD = new int16_t[10];
+    uint8_t sysVoltage = 24;  //default value for system voltage
+    uint8_t cellNumber = 12;  //default value for system voltage
+
     void setConfigForInit()
     {
-      //start flashing led
-      //if no button is pressed during 5 sec, then config 1, if pressed 1 time - conf 2 and so on...
-      //if(btnPressed1 time) ...
-      //else
-
-      capInitPerScale = 50;
-
-      voltageDOD[0] = 22500; //45000mV (22.5 * capInitPerScale)
-      voltageDOD[1] = 20250;
-      voltageDOD[2] = 18000;
-      voltageDOD[3] = 15750;
-      voltageDOD[4] = 13500;
-      voltageDOD[5] = 11250;
-      voltageDOD[6] = 9000;
-      voltageDOD[7] = 6750;
-      voltageDOD[8] = 22500;
-      voltageDOD[9] = 22500;
+      //Read GPIO for configuation setup
+      if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+        sysVoltage = 48;
+        cellNumber = 12 + 12;
+      }
+      if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+        //set periodic timer for testing
+        //or read if pin external pin is high (activate some flag)
+      }
+      voltageDOD[0] = 2100;
+      voltageDOD[1] = 2083;
+      voltageDOD[2] = 2070;
+      voltageDOD[3] = 2053;
+      voltageDOD[4] = 2033;
+      voltageDOD[5] = 2010;
+      voltageDOD[6] = 1983;
+      voltageDOD[7] = 1958;
+      voltageDOD[8] = 1930;
+      voltageDOD[9] = 1885;
 
       /* pinCntrConf bit config
        * VEN_EN: VEN pin control for external voltage divider operation
@@ -57,7 +61,7 @@ namespace bq34110 {
         return false;
       }
       //DOD not used during debug(1S application)
-//      if(!this->gaugeWriteDataClass(0x429E, &capInitPerScale, 1))  // save RemCap Init Percent
+//      if(!this->gaugeWriteDataClass(0x429E, &capScale, 1))  // save RemCap Init Percent
 //        return false;
 //      uint16_t voltageDODFAdrStart = 0x4263;
 //      for(uint32_t i = 0; i< sizeof(voltageDOD); i++)

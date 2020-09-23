@@ -3,7 +3,14 @@
 #include "i2c.h"
 
 namespace  {
+  struct sysParameters {
+    uint8_t capScale ; //this scale % DOD voltage in 2 times
+    uint8_t Voltage;  //default value for system voltage
+    uint8_t CellNumber;  //default value for system voltage
+    uint16_t Capacity; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
+  };
 
+  void setConfigForInit();
 }
 
 namespace bq34110 {
@@ -108,6 +115,7 @@ namespace bq34110 {
           bool calibRawCurr(uint16_t &currentVal);
           bool calibRawVoltage(uint16_t &voltagetVal);
         private:
+            sysParameters m_sysData;
             bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
             bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
     };

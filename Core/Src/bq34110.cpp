@@ -4,43 +4,40 @@
 #include "stdio.h"
 
 namespace  {
-    uint8_t capScale = 2; //this scale % DOD voltage in 2 times
-    int16_t *voltageDOD = new int16_t[10];
-    uint8_t sysVoltage = 24;  //default value for system voltage
-    uint8_t cellNumber = 12;  //default value for system voltage
+  int16_t *voltageDOD = new int16_t[10];
+  sysParameters sysData;
 
-    void setConfigForInit()
-    {
-      //Read GPIO for configuation setup
-      if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
-        sysVoltage = 48;
-        cellNumber = 12 + 12;
-      }
-      if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
-        //set periodic timer for testing
-        //or read if pin external pin is high (activate some flag)
-      }
-      voltageDOD[0] = 2100;
-      voltageDOD[1] = 2083;
-      voltageDOD[2] = 2070;
-      voltageDOD[3] = 2053;
-      voltageDOD[4] = 2033;
-      voltageDOD[5] = 2010;
-      voltageDOD[6] = 1983;
-      voltageDOD[7] = 1958;
-      voltageDOD[8] = 1930;
-      voltageDOD[9] = 1885;
+  void setConfigForInit()
+  {
+    m_sysData.capScale = 2; //this scale % DOD voltage in 2 times
+    m_sysData.Voltage = 24;  //default value for system voltage
+    m_sysData.CellNumber = 12;  //default value for system voltage
+    m_sysData.Capacity = 8500; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
 
-      /* pinCntrConf bit config
-       * VEN_EN: VEN pin control for external voltage divider operation
-       * When set, the VEN pin is used to control an external voltage divider, which provides the divided
-       * down voltage to the BAT pin. Setting this pin also disables the use of the internal battery voltage
-       * divider within the device. When this bit is cleared, the internal battery divider will be activated
-       * whenever a battery voltage measurement is activated.
-       */
-      uint8_t pinCntrConf = 0x00; //default value is 0x00, should be setuped if ALERT pins are used
-
+    //Read GPIO for configuation setup
+    if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+      m_sysData.Voltage = 48;
+      m_sysData.CellNumber = 12 + 12;
     }
+    if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+      m_sysData.Capacity = 9000; // nex st
+    }
+    if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+      //set periodic timer for testing
+      //or read if pin external pin is high (activate some flag)
+    }
+    voltageDOD[0] = 2100;
+    voltageDOD[1] = 2083;
+    voltageDOD[2] = 2070;
+    voltageDOD[3] = 2053;
+    voltageDOD[4] = 2033;
+    voltageDOD[5] = 2010;
+    voltageDOD[6] = 1983;
+    voltageDOD[7] = 1958;
+    voltageDOD[8] = 1930;
+    voltageDOD[9] = 1885;
+
+  }
 }
 
 namespace bq34110 {
@@ -48,9 +45,97 @@ namespace bq34110 {
     bool bq34::init()
     {
       setConfigForInit();
+
+      /*
+       * Settings class configuring
+       * DCHGPOL = 1 && DCP2 = 1
+       * If set, the pin selected for direct charger control will generate a 1 output when charging is
+       * to be enabled
+       *  ALERT1 pin is used for direct charger control
+       */
+      uint8_t chargePinConfig = 0x0C;
+      if(!this->gaugeWriteDataClass(0x4195, &chargePinConfig, sizeof(chargePinConfig)))
+        return false;
+
+      /*
+       * VEN_EN = 1 for external voltage divider operation
+       * ALERT IS NOT CONFIGURED, BUT IT CAN BE USED
+       */
+      uint8_t pinControlConfig = 0x10;
+      if(!this->gaugeWriteDataClass(0x413D, &pinControlConfig, sizeof(pinControlConfig)))
+        return false;
+
+      /*
+       * Config. for battery status flag setings
+       * FCSETVCT = 1  Enables BatteryStatus()[FC] flag set on primary charge termination
+       * TCSETV = 1 Enables BatteryStatus()[TCA] flag set when Voltage() ≥ TC:Set Voltage Threshold
+       * TDCLEARV = 1 Enables BatteryStatus()[TDA] flag clear when Voltage() ≥ TD:Clear Voltage Threshold
+       * TDSETV = 1 Enables BatteryStatus()[TDA] flag set when Voltage() ≤ TD:Set Voltage Threshold
+       * socFlagConfA = 0x0413;
+       */
+      uint8_t socFlagConfA[2];
+      socFlagConfA[0] = 0x04; //High byte first
+      socFlagConfA[1] = 0x13;
+      if(!this->gaugeWriteDataClass(0x41FD, socFlagConfA, sizeof(socFlagConfA)))
+        return false;
+
+      /*
+       * FCCLEARV = 1 Enables BatteryStatus()[FC] flag clear when Voltage() ≤ FC:Clear Voltage Threshold
+       * FCSETV = 1 Enables BatteryStatus()[FC] flag set when Voltage() ≥ FC:Set Voltage Threshold
+       * FDCLEARV = 1 Enables BatteryStatus()[FD] flag clear when Voltage() ≥ FD:Clear Voltage Threshold
+       * FDSETV = 1 Enables BatteryStatus()[FD] flag set when Voltage() ≤ FD:Set Voltage Threshold
+       */
+      uint8_t socFlagConfB = 0x33;
+      if(!this->gaugeWriteDataClass(0x41FF, &socFlagConfB, sizeof(socFlagConfB)))
+        return false;
+
+      /*
+       * The user can set thresholds to alert the host when AccumulatedCharge() reaches a particular level in both
+       * the charge (positive) and discharge (negative) directions. These thresholds are set by Accumulated
+       * Charge Positive Threshold and Accumulated Charge Negative Threshold.
+       */
+      uint8_t accumChargeThrldPositive[2];
+      accumChargeThrldPositive[0] = sysData.Capacity >> 8; //High byte first
+      accumChargeThrldPositive[1] = sysData.Capacity;
+      uint8_t accumChargeThrldNegative[2];
+      accumChargeThrldNegative[0] = sysData.Capacity >> 8; //High byte first
+      accumChargeThrldNegative[1] = sysData.Capacity;
+      if(!this->gaugeWriteDataClass(0x416C, accumChargeThrldPositive, sizeof(accumChargeThrldPositive)))
+        return false;
+      if(!this->gaugeWriteDataClass(0x416E, accumChargeThrldNegative, sizeof(accumChargeThrldNegative)))
+        return false;
+
+      //////
+      ///
+      ///
+      /// TO DO, Safety parameters update (BATHIGH, BATLOW, ... )
+      ///
+
       if (!this->operationConfigA()) {
         return false;
       }
+      uint8_t numOfSeriesCells = sysData.CellNumber;
+      if(!this->gaugeWriteDataClass(0x4155, &numOfSeriesCells, sizeof(numOfSeriesCells)))
+        return false;
+
+      uint8_t flashUpdateOkVoltage[2]; //500 mV
+      flashUpdateOkVoltage[0] = 500 >> 8;
+      flashUpdateOkVoltage[1] = 500;
+      if(!this->gaugeWriteDataClass(0x4157, flashUpdateOkVoltage, sizeof(flashUpdateOkVoltage)))
+        return false;
+
+      uint8_t dischargeDetectTreshld[2]; //2000 mA NORM? this is different from Learning disch current
+      dischargeDetectTreshld[0] = 2000 >> 8;
+      dischargeDetectTreshld[1] = 2000;
+      uint8_t chargeDetectTreshld[2];    //2000 mA NORM?
+      chargeDetectTreshld[0] = (200 / m_sysData.capScale) >> 8;
+      chargeDetectTreshld[1] = 200 / m_sysData.capScale;
+
+      if(!this->gaugeWriteDataClass(0x4157, dischargeDetectTreshld, sizeof(dischargeDetectTreshld)))
+        return false;
+      if(!this->gaugeWriteDataClass(0x4157, chargeDetectTreshld, sizeof(chargeDetectTreshld)))
+        return false;
+
       //Manufacturing Status Init
       uint8_t data[2];
       data[0] = 0x00; //High byte first
@@ -192,9 +277,10 @@ namespace bq34110 {
       i2c_data[2] = 0xFF & configAdr >> 8;
       /*
        * Write data is BigEndian format
+       * SCALED = 1, SLEEP = 1, JEITA = 1
        */
-      i2c_data[3] = 0x82;    //confgih High byte
-      i2c_data[4] = 0x20;   //config Low byte
+      i2c_data[3] = 0x06;    //confgih High byte
+      i2c_data[4] = 0x80;   //config Low byte
       if(!this->gaugeWrite(i2c_data, sizeof(i2c_data)))
         return false;
       /*
@@ -354,7 +440,7 @@ namespace bq34110 {
         rawDataSum += tempCurr;
         counterPrev = counterNow;
       }
-      currentVal = (rawDataSum / 10) * curCapScale;
+      currentVal = (rawDataSum / 10) * sysData.capScale;
       return true;
     }
 

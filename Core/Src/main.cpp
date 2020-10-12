@@ -100,7 +100,6 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  bq.init();
   bq.enterCalMode();
   if(!bq.calibRawCurr(calibCurtVal)) {
 //    Error_Handler();

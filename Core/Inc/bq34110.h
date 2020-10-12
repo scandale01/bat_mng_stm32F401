@@ -8,20 +8,16 @@ namespace  {
     uint8_t Voltage;  //default value for system voltage
     uint8_t CellNumber;  //default value for system voltage
     uint16_t Capacity; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
+    uint8_t lowCapAlert_prct;
+    uint8_t enExtTesting;
+    uint16_t testCyclePeriod_days;
   };
 
-  void setConfigForInit();
 }
 
 namespace bq34110 {
     constexpr int8_t selfAddress = 0xAA;
 
-    struct sysParam{
-      uint16_t capacity = 17000; //mAh
-      uint16_t systemVoltage = 24000; //mV
-      uint8_t configType = 1;
-      uint8_t capacScale = 1;
-    };
     namespace cmnd {
         constexpr uint8_t CNTRL = 0x00;       //0x00 and 0x01, unit NA (access R/W)
         constexpr uint8_t TEMP = 0x06;        //0x06 and 0x07, unit 0.1K (access R)
@@ -99,7 +95,7 @@ namespace bq34110 {
     }
     class bq34 {
         public:
-          bool init();
+          bq34();
           bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
           bool getSubCommandData(uint8_t WCmnCode, uint16_t subCmnd, uint8_t RCmndCode, uint16_t& data);
           bool gaugeControlSubCmnd (uint16_t subCmnd);
@@ -114,10 +110,13 @@ namespace bq34110 {
           bool calibBoardOffset();
           bool calibRawCurr(uint16_t &currentVal);
           bool calibRawVoltage(uint16_t &voltagetVal);
+          virtual ~bq34();
         private:
-            sysParameters m_sysData;
-            bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
-            bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
+          bool init();
+          bool chargeInit();
+          sysParameters m_sysData;
+          bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
+          bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
     };
 
 }

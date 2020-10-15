@@ -2,10 +2,28 @@
 #include "stdint.h"
 #include "i2c.h"
 #include "stdio.h"
+#include <bitset>
 
 namespace  {
   int16_t voltageDOD[10] = {2100, 2083, 2070, 2053, 2033, 2010,
       1983, 1958, 1930, 1885
+  };
+  struct batteryStatus {
+    bool dsgIDetect; //Discharge current detection
+    bool chgIDetect; //Charge current detection
+    bool dsgAlarmTerminate; //Terminate Discharge Alarm,  flag is set and cleared based on the selected SOC Flag Config A options
+    bool chgAlarmTerminate; //Terminate Charge Alarm, SOC Flag Config A options
+    bool fullCharge; //Full charge is detected ( bit is controlled by settings in SOC Flag Config A and SOC Flag Config B)
+    bool fullDischarge; //Full discharge is detected (based on the selected SOC Flag Config B options)
+    bool chgInhibit; //If set, this indicates charging should not begin because Temperature() is outside the acceptable range
+    bool sleep; //The device is in SLEEP mode when set.
+    bool batLow; //Battery Low Voltage Alarm (based on the selected thresholds in Safety.BATLOW data flash)
+    bool batHigh; // Battery High Voltage Alarm (based on the selected thresholds in Safety.BATLOW data flash)
+    bool overTmpInDsgMode; // Overtemperature in Discharge condition is detected
+    bool overTmpInChgMode; //Overtemperature in Charge condition is detected.
+    bool lowTmpInDsgMode;
+    bool lowTmpInChgMode;
+    bool SOCLow;          //State-Of-Charge low detection
   };
 
 }
@@ -139,6 +157,34 @@ namespace bq34110 {
       delete[] data;
       return true;
     }
+    bool bq34::gaugeWriteDataClass(uint16_t subClass, int8_t *pData, uint8_t dataLen)
+  {
+    uint8_t *data = new uint8_t[3 + dataLen];
+    data[0] = bq34110::cmnd::MAC;
+    data[1] = subClass;
+    data[2] = 0xFF & subClass >>8;
+    for (uint8_t var = 0;  var < dataLen; var++) {
+      data[3 + var] = *(pData + var);
+    }
+    if (! this->gaugeWrite(data, sizeof(data))) {
+      return false;
+    }
+    uint8_t dataCheckSum[2];
+    dataCheckSum[0] = bq34110::cmnd::MACDATSUM;
+    dataCheckSum[1] = 0;
+    for (uint8_t var = 0;  var < dataLen; var++) {
+      dataCheckSum[1] += *(pData + var);
+    }
+    dataCheckSum[1] = ~((dataCheckSum[1] + data[1] + data[2]) & 0xFF);
+    if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
+      return false;
+    dataCheckSum[0] = bq34110::cmnd::MACDATLEN;
+    dataCheckSum[1] = 4 + dataLen;          //4 + sizeof write config bytes
+    if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
+      return false;
+    delete[] data;
+    return true;
+  }
 
     bool bq34::operationConfigA()
     {
@@ -173,28 +219,11 @@ namespace bq34110 {
     bool bq34::CEDVConfig()
     {
       uint16_t configAdr = 0x424B;
-      uint8_t i2c_data[5];
-      i2c_data[0] = bq34110::cmnd::MAC;
-      i2c_data[1] = configAdr;
-      i2c_data[2] = 0xFF & configAdr >> 8;
-      /*
-       * Write data is BigEndian format
-       */
-      i2c_data[3] = 0x04;    //confgih High byte
-      i2c_data[4] = 0x56 ;   //config Low byte
-      if(!this->gaugeWrite(i2c_data, sizeof(i2c_data)))
-        return false;
-      /*
-       * Separately MACDataSum and MACDataLen write after
-       */
-      uint8_t dataCheckSum[2];
-      dataCheckSum[0] = bq34110::cmnd::MACDATSUM;
-      dataCheckSum[1] = ~((i2c_data[1] + i2c_data[2] + i2c_data[3] + i2c_data[4]) & 0xFF);
-      if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
-        return false;
-      dataCheckSum[0] = bq34110::cmnd::MACDATLEN;
-      dataCheckSum[1] = 4 + 2;          //4 + sizeof write config bytes
-      if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
+      uint8_t i2c_data[2];
+
+      i2c_data[0] = 0x24;    //confgih High byte
+      i2c_data[1] = 0x1a ;   //config Low byte
+      if(!this->gaugeWriteDataClass(configAdr, i2c_data, sizeof(i2c_data)))
         return false;
       return true;
     }
@@ -348,8 +377,8 @@ namespace bq34110 {
 
     bool bq34::gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen)
     {
-      uint8_t cmndDat[] = {cmnd};
-      if (HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), cmndDat, sizeof(cmnd), 100) != HAL_OK) {
+      uint8_t cmndDat= cmnd;
+      if (HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), &cmndDat, sizeof(cmnd), 100) != HAL_OK) {
         return false;
       }
       if (HAL_I2C_Master_Receive(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), pData, dataLen, 1500) != HAL_OK) {
@@ -444,13 +473,12 @@ namespace bq34110 {
 
       uint8_t flashUpdateOkVoltage[2]; //500 mV
       flashUpdateOkVoltage[0] = 500 >> 8;
-      flashUpdateOkVoltage[1] = 500;
       if(!this->gaugeWriteDataClass(0x4157, flashUpdateOkVoltage, sizeof(flashUpdateOkVoltage)))
         return false;
 
       uint8_t dischargeDetectTreshld[2]; //2000 mA NORM? this is different from Learning disch current
       dischargeDetectTreshld[0] = 2000 >> 8;
-      dischargeDetectTreshld[1] = 2000;
+      dischargeDetectTreshld[1] = 0xFF & 2000;
       uint8_t chargeDetectTreshld[2];    //2000 mA NORM?
       chargeDetectTreshld[0] = (200 / m_sysData.capScale) >> 8;
       chargeDetectTreshld[1] = 200 / m_sysData.capScale;
@@ -474,33 +502,34 @@ namespace bq34110 {
       if (!this->CEDVConfig()) {
         return false;
       }
-
+      this->updBatCondData();
+      return true;
     }
 
     bool bq34::chargeInit() {
-      int16_t data[2];
+      uint8_t data[2];
       data[0] = 300 >> 8; // Charge Current T1-T2 (300 mA)
-      data[1] = 300;
+      data[1] = 0xFF & 300;
       if(!this->gaugeWriteDataClass(0x410E, data, sizeof(data)))
         return false;
       data[0] = 300 >> 8; // Charge Current T2-T3 (300 mA)
-      data[1] = 300;
+      data[1] = 0xFF & 300;
       if(!this->gaugeWriteDataClass(0x4110, data, sizeof(data)))
         return false;
       data[0] = 300 >> 8; // Charge Current T3-T4 (300 mA)
-      data[1] = 300;
+      data[1] = 0xFF & 300;
       if(!this->gaugeWriteDataClass(0x4112, data, sizeof(data)))
         return false;
       data[0] = 2290 >> 8; // Charge Voltage T1-T2 (2290 * 12 -> 27480 mV)
-      data[1] = 2290;
+      data[1] = 0xFF & 2290;
       if(!this->gaugeWriteDataClass(0x4114, data, sizeof(data)))
         return false;
       data[0] = 2290 >> 8; // Charge Voltage T2-T3 (2290 mV)
-      data[1] = 2290;
+      data[1] = 0xFF & 2290;
       if(!this->gaugeWriteDataClass(0x4116, data, sizeof(data)))
         return false;
       data[0] = 2290 >> 8; // Charge Voltage T3-T4 (2290 mV)
-      data[1] = 2290;
+      data[1] = 0xFF & 2290;
       if(!this->gaugeWriteDataClass(0x4118, data, sizeof(data)))
         return false;
       data[0] = 100 >> 8; //Maintenance Current (mA)
@@ -524,15 +553,108 @@ namespace bq34110 {
       if(!this->gaugeWriteDataClass(0x4122, data, sizeof(data)))
         return false;
       data[0] = 2290 >> 8; //Last Charge Voltage T1-T2 (mV)
-      data[1] = 2290;
+      data[1] = 0xFF & 2290;
       if(!this->gaugeWriteDataClass(0x40C7, data, sizeof(data)))
         return false;
       data[0] = 2290 >> 8; //Last Charge Voltage T2-T3 (mV)
-      data[1] = 2290;
+      data[1] = 0xFF & 2290;
       if(!this->gaugeWriteDataClass(0x40C9, data, sizeof(data)))
         return false;
       data[0] = 2290 >> 8; //Last Charge Voltage T3-T4 (mV)
-      data[1] = 2290;
+      data[1] = 0xFF & 2290;
       if(!this->gaugeWriteDataClass(0x40CB, data, sizeof(data)))
         return false;
+      return true;
+    }
+
+    void bq34::getBatStatus(batteryStatus& pstatStruct) {
+      uint16_t tmp = 0;
+      if(!this->getStdCommandData(bq34110::cmnd::BSTAT, tmp))
+        return;
+      std::bitset<16> bset(tmp);
+      if (bset.test(0)) {
+        m_batStatus.dsgIDetect = true;
+      } else
+        m_batStatus.dsgIDetect = false;
+      if (bset.test(1)) {
+        m_batStatus.chgIDetect = true;
+      } else
+        m_batStatus.chgIDetect = false;
+      if (bset.test(2)) {
+        m_batStatus.dsgAlarmTerminate = true;
+      } else
+        m_batStatus.dsgAlarmTerminate = false;
+      if (bset.test(3)) {
+        m_batStatus.chgAlarmTerminate = true;
+      } else
+        m_batStatus.chgAlarmTerminate = false;
+      if (bset.test(4)) {
+        m_batStatus.fullCharge = true;
+      } else
+        m_batStatus.fullCharge = false;
+      if (bset.test(5)) {
+        m_batStatus.fullDischarge = true;
+      } else
+        m_batStatus.fullDischarge = false;
+      if (bset.test(6)) {
+        m_batStatus.chgInhibit = true;
+      } else
+        m_batStatus.chgInhibit = false;
+      if (bset.test(7)) {
+        m_batStatus.sleep = true;
+      } else
+        m_batStatus.sleep = false;
+      if (bset.test(8)) {
+        m_batStatus.batLow = true;
+      } else
+        m_batStatus.batLow = false;
+      if (bset.test(9)) {
+        m_batStatus.batHigh = true;
+      } else
+        m_batStatus.batHigh = false;
+      if (bset.test(10)) {
+        m_batStatus.overTmpInDsgMode = true;
+      } else
+        m_batStatus.overTmpInDsgMode = false;
+      if (bset.test(11)) {
+        m_batStatus.overTmpInChgMode = true;
+      } else
+        m_batStatus.overTmpInChgMode = false;
+      if (bset.test(12)) {
+        m_batStatus.lowTmpInDsgMode = true;
+      } else
+        m_batStatus.lowTmpInDsgMode = false;
+      if (bset.test(13)) {
+        m_batStatus.lowTmpInChgMode = true;
+      } else
+        m_batStatus.lowTmpInChgMode = false;
+      if (bset.test(14)) {
+        m_batStatus.SOCLow = true;
+      } else
+        m_batStatus.SOCLow = false;
+      return;
+    }
+    void bq34::updBatCondData() {
+      uint16_t tmp;
+      if (!this->getStdCommandData(bq34110::cmnd::VOLT, tmp)) {
+        m_batCond.voltage = 0xFFFF;
+      }
+      m_batCond.voltage = tmp;
+      if (!this->getStdCommandData(bq34110::cmnd::Current, tmp)) {
+        m_batCond.current = 0xFFFF;
+      }
+      m_batCond.current = tmp * m_sysData.capScale;
+      if (!this->getStdCommandData(bq34110::cmnd::RC, tmp)) {
+        m_batCond.remCap = 0xFFFF;
+      }
+      m_batCond.remCap = tmp * m_sysData.capScale;
+      if (!this->getStdCommandData(bq34110::cmnd::FCC, tmp)) {
+        m_batCond.fullChgCap = 0xFFFF;
+      }
+      m_batCond.fullChgCap = tmp * m_sysData.capScale;
+      if (!this->getStdCommandData(bq34110::cmnd::ACCCHAR, tmp)) {
+        m_batCond.acummCharge = 0xFFFF;
+      }
+      m_batCond.acummCharge = tmp * m_sysData.capScale;
+    }
 }

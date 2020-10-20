@@ -17,17 +17,16 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "i2c.h"
+#include "rtc.h"
 #include "usart.h"
 #include "gpio.h"
-#include "bq34110.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "bq34110.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,11 +46,18 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-	bq34110::bq34 bq;
-	uint16_t dataRead;
-	uint16_t gpioFlag = 0;
-	uint16_t calibCurtVal;
-	uint16_t calibVolttVal;
+uint16_t dataRead;
+uint16_t gpioFlag = 0;
+uint16_t calibCurtVal;
+uint16_t calibVolttVal;
+RTC_TimeTypeDef sysTime = {0};
+RTC_DateTypeDef sysDate = {0};
+uint32_t daysForTest = 7;
+bool testStarded = false;
+constexpr uint32_t checkDelay_ms = 1000;
+uint32_t lasCheckTime = 0;
+bq34110::bq34 bq;
+bq34110::config::conf configSetup;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,9 +69,9 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	if(GPIO_Pin == B1_Pin) {
-	  gpioFlag = 1;
-	}
+  if(GPIO_Pin == B1_Pin) {
+    gpioFlag = 1;
+  }
 }
 /* USER CODE END 0 */
 
@@ -99,6 +105,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   bq.enterCalMode();
   if(!bq.calibRawCurr(calibCurtVal)) {
@@ -110,6 +117,14 @@ int main(void)
   }
   bq.exitCalMode();
 
+  HAL_RTC_GetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
+  if(HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) && HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+    daysForTest = 56;
+  } else if(HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) && !HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+    daysForTest = 28;
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -120,6 +135,30 @@ int main(void)
       uint16_t dataRead;
       bq.getSubCommandData(bq34110::cmnd::CNTRL, bq34110::subcmnd::FW_VERSION, bq34110::cmnd::CNTRL, dataRead);
       gpioFlag = 0;
+    }
+    if(sysDate.Date > daysForTest && !testStarded) {
+      if(bq.gaugeControlSubCmnd(bq34110::subcmnd::ACCUM_RESET)) {
+        bq.updBatCondData();
+        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //DRAINING LOAD ON
+        testStarded = true;
+        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //OUTPUT PIN HIGH, TEST IS GOING
+        sysTime = {0};
+        sysDate = {0};
+        HAL_RTC_SetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
+        HAL_RTC_SetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
+      }
+    }
+    if(testStarded && (HAL_GetTick() - lasCheckTime > checkDelay_ms)) {
+      bq.updBatCondData();
+      HAL_Delay(200);
+      bq.updBatStatus();
+    }
+    if (bq.m_batStatus.SOCLow) {
+      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
+      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
+      if(bq.m_batCond.acummCharge > -(sysCapacity_mAh)) {
+        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //ALERT OF LOW CAPACITY
+      }
     }
     /* USER CODE END WHILE */
 
@@ -136,16 +175,19 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
-  /** Configure the main internal regulator output voltage 
+  /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 16;
@@ -156,7 +198,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -166,6 +208,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
@@ -196,7 +244,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */

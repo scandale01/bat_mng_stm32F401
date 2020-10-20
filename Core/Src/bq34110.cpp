@@ -567,7 +567,7 @@ namespace bq34110 {
       return true;
     }
 
-    void bq34::getBatStatus(batteryStatus& pstatStruct) {
+    void bq34::updBatStatus() {
       uint16_t tmp = 0;
       if(!this->getStdCommandData(bq34110::cmnd::BSTAT, tmp))
         return;
@@ -657,4 +657,5 @@ namespace bq34110 {
       }
       m_batCond.acummCharge = tmp * m_sysData.capScale;
     }
+
 }

@@ -135,7 +135,7 @@ namespace bq34110 {
         bool calibBoardOffset();
         bool calibRawCurr(uint16_t &currentVal);
         bool calibRawVoltage(uint16_t &voltagetVal);
-        void getBatStatus(batteryStatus& pstatStruct);
+        void updBatStatus();
         void updBatCondData();
         batteryStatus m_batStatus;
         batteryCondition m_batCond;

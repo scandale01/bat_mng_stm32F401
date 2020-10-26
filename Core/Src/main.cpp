@@ -57,7 +57,6 @@ bool testStarded = false;
 constexpr uint32_t checkDelay_ms = 1000;
 uint32_t lasCheckTime = 0;
 bq34110::bq34 bq;
-bq34110::config::conf configSetup;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -119,11 +118,6 @@ int main(void)
 
   HAL_RTC_GetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
-  if(HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) && HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
-    daysForTest = 56;
-  } else if(HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) && !HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
-    daysForTest = 28;
-  }
 
   /* USER CODE END 2 */
 
@@ -136,9 +130,10 @@ int main(void)
       bq.getSubCommandData(bq34110::cmnd::CNTRL, bq34110::subcmnd::FW_VERSION, bq34110::cmnd::CNTRL, dataRead);
       gpioFlag = 0;
     }
-    if(sysDate.Date > daysForTest && !testStarded) {
+    if(sysDate.Date > bq.m_sysData.testCyclePeriod_days && !testStarded) {
       if(bq.gaugeControlSubCmnd(bq34110::subcmnd::ACCUM_RESET)) {
         bq.updBatCondData();
+        //@TODO: If BATLOW, not starting test
         HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //DRAINING LOAD ON
         testStarded = true;
         HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //OUTPUT PIN HIGH, TEST IS GOING
@@ -156,7 +151,7 @@ int main(void)
     if (bq.m_batStatus.SOCLow) {
       HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
       HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
-      if(bq.m_batCond.acummCharge > -(sysCapacity_mAh)) {
+      if(bq.m_batCond.acummCharge < bq.m_sysData.Capacity * 100 / bq.m_sysData.lowCapAlert_prct ) {    //in DSG accumCharge is growing (opposite in CHG)
         HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //ALERT OF LOW CAPACITY
       }
     }

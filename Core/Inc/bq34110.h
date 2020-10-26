@@ -2,18 +2,6 @@
 #include "stdint.h"
 #include "i2c.h"
 
-namespace  {
-  struct sysParameters {
-    uint8_t capScale ; //this scale % DOD voltage in 2 times
-    uint8_t Voltage;  //default value for system voltage
-    uint8_t CellNumber;  //default value for system voltage
-    uint16_t Capacity; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
-    uint8_t lowCapAlert_prct;
-    uint8_t enExtTesting;
-    uint16_t testCyclePeriod_days;
-  };
-}
-
 namespace bq34110 {
     constexpr int8_t selfAddress = 0xAA;
 
@@ -83,15 +71,6 @@ namespace bq34110 {
          constexpr uint16_t MANUFACT_STATUS = 0x0057;       //This MAC subcommand returns the values of various functional modes of the device
 
     }
-    namespace config {
-      struct conf {
-        uint16_t sysVoltage_mV;
-        uint16_t sysCapacity_mAh;
-        uint8_t lowCapAlert_prct;
-        uint8_t enExtTesting;
-        uint16_t testCyclePeriod_days;
-      };
-    }
     class bq34 {
       public:
         struct batteryStatus {
@@ -118,6 +97,15 @@ namespace bq34110 {
           uint16_t fullChgCap;
           uint32_t acummCharge;
         };
+        struct sysParameters {
+          uint8_t capScale ; //this scale % DOD voltage in 2 times
+          uint8_t Voltage;  //default value for system voltage
+          uint8_t CellNumber;  //default value for system voltage
+          uint16_t Capacity; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
+          uint8_t lowCapAlert_prct;
+          uint8_t enExtTesting;
+          uint16_t testCyclePeriod_days;
+        };
       public:
         bq34();
         bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
@@ -139,11 +127,11 @@ namespace bq34110 {
         void updBatCondData();
         batteryStatus m_batStatus;
         batteryCondition m_batCond;
+        sysParameters m_sysData;
         virtual ~bq34();
       private:
         bool init();
         bool chargeInit();
-        sysParameters m_sysData;
         bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
         bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
     };

@@ -448,6 +448,7 @@ namespace bq34110 {
        * Charge Positive Threshold and Accumulated Charge Negative Threshold.
        */
       uint8_t accumChargeThrldPositive[2];
+      //@TODO multiply by 0.85 to have some offset from ideal values
       accumChargeThrldPositive[0] = m_sysData.capScale >> 8; //High byte first
       accumChargeThrldPositive[1] = m_sysData.capScale;
       uint8_t accumChargeThrldNegative[2];
@@ -503,6 +504,8 @@ namespace bq34110 {
         return false;
       }
       this->updBatCondData();
+      //@TODO init gas gauge config (when it understand voltage lvl) and safety levels
+
       return true;
     }
 

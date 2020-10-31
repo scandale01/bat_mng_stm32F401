@@ -148,7 +148,11 @@ int main(void)
       HAL_Delay(200);
       bq.updBatStatus();
     }
-    if (bq.m_batStatus.SOCLow) {
+    if (testStarded && (bq.m_batCond.acummCharge > bq.m_sysData.Capacity * 100 / bq.m_sysData.lowCapAlert_prct)) {
+      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
+	  HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
+	}
+    if (bq.m_batStatus.SOCLow && testStarded) {
       HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
       HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
       if(bq.m_batCond.acummCharge < bq.m_sysData.Capacity * 100 / bq.m_sysData.lowCapAlert_prct ) {    //in DSG accumCharge is growing (opposite in CHG)

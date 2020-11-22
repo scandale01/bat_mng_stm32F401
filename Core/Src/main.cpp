@@ -56,7 +56,7 @@ uint32_t daysForTest = 7;
 bool testStarded = false;
 constexpr uint32_t checkDelay_ms = 1000;
 uint32_t lasCheckTime = 0;
-bq34110::bq34 bq;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -67,11 +67,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-  if(GPIO_Pin == B1_Pin) {
-    gpioFlag = 1;
-  }
-}
+
 /* USER CODE END 0 */
 
 /**
@@ -106,15 +102,17 @@ int main(void)
   MX_I2C1_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-  bq.enterCalMode();
-  if(!bq.calibRawCurr(calibCurtVal)) {
-//    Error_Handler();
-    calibCurtVal = 0;
-  }
-  if (!bq.calibRawVoltage(calibVolttVal)) {
-    calibVolttVal = 0;
-  }
-  bq.exitCalMode();
+//  bq.enterCalMode();
+//  if(!bq.calibRawCurr(calibCurtVal)) {
+////    Error_Handler();
+//    calibCurtVal = 0;
+//  }
+//  if (!bq.calibRawVoltage(calibVolttVal)) {
+//    calibVolttVal = 0;
+//  }
+//  bq.exitCalMode();
+  bq34110::bq34 bq;
+
 
   HAL_RTC_GetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
@@ -125,18 +123,17 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if(gpioFlag == 1) {
-      uint16_t dataRead;
-      bq.getSubCommandData(bq34110::cmnd::CNTRL, bq34110::subcmnd::FW_VERSION, bq34110::cmnd::CNTRL, dataRead);
-      gpioFlag = 0;
-    }
     if(sysDate.Date > bq.m_sysData.testCyclePeriod_days && !testStarded) {
       if(bq.gaugeControlSubCmnd(bq34110::subcmnd::ACCUM_RESET)) {
         bq.updBatCondData();
         //@TODO: If BATLOW, not starting test
-        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //DRAINING LOAD ON
+//        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //DRAINING LOAD ON
+        if (!bq.gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_ON)) {
+          testStarded = false;
+          return 0;
+        }
         testStarded = true;
-        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //OUTPUT PIN HIGH, TEST IS GOING
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //OUTPUT PIN HIGH, TEST IS GOING  //for tests LED selected
         sysTime = {0};
         sysDate = {0};
         HAL_RTC_SetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
@@ -149,11 +146,20 @@ int main(void)
       bq.updBatStatus();
     }
     if (bq.m_batStatus.SOCLow) {
-      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
-      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
-      if(bq.m_batCond.acummCharge < bq.m_sysData.Capacity * 100 / bq.m_sysData.lowCapAlert_prct ) {    //in DSG accumCharge is growing (opposite in CHG)
-        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //ALERT OF LOW CAPACITY
+      if (!bq.gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF)) {
+        testStarded = false;
+        return 0;
       }
+//      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
+      if(bq.m_batCond.acummCharge < bq.m_sysData.Capacity * 100 / bq.m_sysData.lowCapAlert_prct ) {    //in DSG accumCharge is growing (opposite in CHG)
+//        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //ALERT OF LOW CAPACITY
+      }
+    }
+    //for testing
+    if (gpioFlag == 1) {
+      bq.m_sysData.testCyclePeriod_days = 0;
+      gpioFlag = 0;
     }
     /* USER CODE END WHILE */
 
@@ -215,7 +221,11 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+  if(GPIO_Pin == B1_Pin) {
+    gpioFlag = 1;
+  }
+}
 /* USER CODE END 4 */
 
 /**

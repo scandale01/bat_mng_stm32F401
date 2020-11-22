@@ -55,6 +55,8 @@ namespace bq34110 {
 
          constexpr uint16_t CAL_TOGGLE = 0x002D;        //toggles the value of OperationStatus()[CALMD]
 
+         constexpr uint16_t SECURITY_KEYS = 0x0035;     //Reads and writes Security Keys
+
          constexpr uint16_t EOS_START_LEARN = 0x0039;   //Initiates an EOS learning phase
 
          constexpr uint16_t EOS_RCELL_RRATE_LEARN = 0x003B;   //Initiates the Initial Rcell and Initial RRate learning procedures
@@ -128,12 +130,13 @@ namespace bq34110 {
         batteryStatus m_batStatus;
         batteryCondition m_batCond;
         sysParameters m_sysData;
-        virtual ~bq34();
+//        ~bq34();
       private:
         bool init();
         bool chargeInit();
         bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
         bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
+        bool unseal();
     };
 
 }

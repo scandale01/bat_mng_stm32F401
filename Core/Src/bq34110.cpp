@@ -35,8 +35,10 @@ namespace bq34110 {
       m_sysData.Voltage = 24;  //default value for system voltage
       m_sysData.CellNumber = 12;  //default value for system voltage
       m_sysData.Capacity = 8500; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
+      m_sysData.testCyclePeriod_days = 60 ; //60 days test period
 
       //Read GPIO for configuation setup
+      /*
       if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
         m_sysData.Voltage = 48;
         m_sysData.CellNumber = 12 + 12;
@@ -48,6 +50,8 @@ namespace bq34110 {
         //set periodic timer for testing
         //or read if pin external pin is high (activate some flag)
       }
+      */
+      unseal();
       init();
     }
 
@@ -157,34 +161,34 @@ namespace bq34110 {
       delete[] data;
       return true;
     }
-    bool bq34::gaugeWriteDataClass(uint16_t subClass, int8_t *pData, uint8_t dataLen)
-  {
-    uint8_t *data = new uint8_t[3 + dataLen];
-    data[0] = bq34110::cmnd::MAC;
-    data[1] = subClass;
-    data[2] = 0xFF & subClass >>8;
-    for (uint8_t var = 0;  var < dataLen; var++) {
-      data[3 + var] = *(pData + var);
-    }
-    if (! this->gaugeWrite(data, sizeof(data))) {
-      return false;
-    }
-    uint8_t dataCheckSum[2];
-    dataCheckSum[0] = bq34110::cmnd::MACDATSUM;
-    dataCheckSum[1] = 0;
-    for (uint8_t var = 0;  var < dataLen; var++) {
-      dataCheckSum[1] += *(pData + var);
-    }
-    dataCheckSum[1] = ~((dataCheckSum[1] + data[1] + data[2]) & 0xFF);
-    if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
-      return false;
-    dataCheckSum[0] = bq34110::cmnd::MACDATLEN;
-    dataCheckSum[1] = 4 + dataLen;          //4 + sizeof write config bytes
-    if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
-      return false;
-    delete[] data;
-    return true;
-  }
+//    bool bq34::gaugeWriteDataClass(uint16_t subClass, int8_t *pData, uint8_t dataLen)
+//  {
+//    uint8_t *data = new uint8_t[3 + dataLen];
+//    data[0] = bq34110::cmnd::MAC;
+//    data[1] = subClass;
+//    data[2] = 0xFF & subClass >>8;
+//    for (uint8_t var = 0;  var < dataLen; var++) {
+//      data[3 + var] = *(pData + var);
+//    }
+//    if (! this->gaugeWrite(data, sizeof(data))) {
+//      return false;
+//    }
+//    uint8_t dataCheckSum[2];
+//    dataCheckSum[0] = bq34110::cmnd::MACDATSUM;
+//    dataCheckSum[1] = 0;
+//    for (uint8_t var = 0;  var < dataLen; var++) {
+//      dataCheckSum[1] += *(pData + var);
+//    }
+//    dataCheckSum[1] = ~((dataCheckSum[1] + data[1] + data[2]) & 0xFF);
+//    if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
+//      return false;
+//    dataCheckSum[0] = bq34110::cmnd::MACDATLEN;
+//    dataCheckSum[1] = 4 + dataLen;          //4 + sizeof write config bytes
+//    if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
+//      return false;
+//    delete[] data;
+//    return true;
+//  }
 
     bool bq34::operationConfigA()
     {
@@ -393,8 +397,43 @@ namespace bq34110 {
       {
         return false;
       } else {
+        HAL_Delay(1);
         return true;
       }
+    }
+
+    bool bq34::unseal() {
+//      if (!gaugeControlSubCmnd(bq34110::subcmnd::SECURITY_KEYS)) {
+//        return false;
+//      }
+//      HAL_Delay(1);
+      uint8_t data[3];
+      uint8_t keyArr[4] = {0x36, 0x72, 0x04, 0x14};
+      data[0] = bq34110::cmnd::CNTRL;
+      data[1] = keyArr[3];
+      data[2] = keyArr[2];
+//      data[3] = keyArr[1];
+//      data[4] = keyArr[0];
+      if (!gaugeWrite(data, sizeof(data))) {
+        return false;
+      }
+      data[1] = keyArr[1];
+      data[2] = keyArr[0];
+      HAL_Delay(1);
+      if (!gaugeWrite(data, sizeof(data))) {
+        return false;
+      }
+//      uint8_t dataCheckSum[2];
+//      dataCheckSum[0] = bq34110::cmnd::MACDATSUM;
+//      dataCheckSum[1] = ~((bq34110::subcmnd::SECURITY_KEYS +
+//          data[1] + data[2] + data[3] + data[4]) & 0xFF);
+//      if(!gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
+//        return false;
+//      dataCheckSum[0] = bq34110::cmnd::MACDATLEN;
+//      dataCheckSum[1] = 4 + 4;          //4 + sizeof write config bytes
+//      if(!this->gaugeWrite(dataCheckSum, sizeof(dataCheckSum)))
+//        return false;
+      return true;
     }
 
     bool bq34::init()
@@ -449,11 +488,11 @@ namespace bq34110 {
        */
       uint8_t accumChargeThrldPositive[2];
       //@TODO multiply by 0.85 to have some offset from ideal values
-      accumChargeThrldPositive[0] = m_sysData.capScale >> 8; //High byte first
-      accumChargeThrldPositive[1] = m_sysData.capScale;
+      accumChargeThrldPositive[0] = m_sysData.Capacity >> 8; //High byte first
+      accumChargeThrldPositive[1] = m_sysData.Capacity;
       uint8_t accumChargeThrldNegative[2];
-      accumChargeThrldNegative[0] = m_sysData.capScale >> 8; //High byte first
-      accumChargeThrldNegative[1] = m_sysData.capScale;
+      accumChargeThrldNegative[0] = m_sysData.Capacity >> 8; //High byte first
+      accumChargeThrldNegative[1] = m_sysData.Capacity;
       if(!this->gaugeWriteDataClass(0x416C, accumChargeThrldPositive, sizeof(accumChargeThrldPositive)))
         return false;
       if(!this->gaugeWriteDataClass(0x416E, accumChargeThrldNegative, sizeof(accumChargeThrldNegative)))

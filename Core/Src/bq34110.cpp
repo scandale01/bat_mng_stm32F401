@@ -700,4 +700,52 @@ namespace bq34110 {
       m_batCond.acummCharge = tmp * m_sysData.capScale;
     }
 
+  bool bq34::isVoltNorm() {
+    uint16_t voltage = 0;
+    if (getStdCommandData(bq34110::cmnd::VOLT, voltage)) {
+      if (voltage < m_sysData.Voltage) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void bq34::startTest(){
+    if(gaugeControlSubCmnd(bq34110::subcmnd::ACCUM_RESET)) {
+      updBatCondData();
+//    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //DRAINING LOAD ON
+      if (!gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_ON)) { //for test at home ONLY
+        m_testStarded = false;
+        return;
+      }
+      m_testStarded = true;
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //OUTPUT PIN HIGH, TEST IS GOING  //for tests LED selected
+    }
+  }
+
+  void bq34::checkTestCondition(uint32_t& cntr){
+    if (m_testStarded && (m_batCond.acummCharge * 100 / m_sysData.Capacity) > m_sysData.lowCapAlert_prct) {
+      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); // DRAINING LOAD OFF
+      gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF);// for test at home ONLY
+      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); // OUTPUT PIN LOW, TEST IS NOT-GOING
+      cntr++;
+      m_testStarded = false;
+    } else if (m_batStatus.SOCLow && m_testStarded) {
+      //HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
+//      m_testStarded = false;
+      if (!gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF)) { //for test at home ONLY
+        m_testStarded = false;
+      }
+      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
+      if(m_batCond.acummCharge * 100 / m_sysData.Capacity < m_sysData.lowCapAlert_prct) {    //in DSG accumCharge is growing (opposite in CHG)
+        //HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //ALERT OF LOW CAPACITY
+      }
+    }
+  }
+
+  bool bq34::isTestStarted(){
+    return m_testStarded;
+  }
+
 }

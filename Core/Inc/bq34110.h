@@ -108,6 +108,7 @@ namespace bq34110 {
           uint8_t enExtTesting;
           uint16_t testCyclePeriod_days;
         };
+
       public:
         bq34();
         bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
@@ -127,6 +128,10 @@ namespace bq34110 {
         bool calibRawVoltage(uint16_t &voltagetVal);
         void updBatStatus();
         void updBatCondData();
+        bool isVoltNorm();
+        void startTest();
+        void checkTestCondition(uint32_t& cntr);
+        bool isTestStarted();
         batteryStatus m_batStatus;
         batteryCondition m_batCond;
         sysParameters m_sysData;
@@ -137,6 +142,7 @@ namespace bq34110 {
         bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
         bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
         bool unseal();
+        bool m_testStarded = false;
     };
 
 }

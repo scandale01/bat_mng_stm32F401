@@ -53,9 +53,9 @@ uint16_t calibVolttVal;
 RTC_TimeTypeDef sysTime = {0};
 RTC_DateTypeDef sysDate = {0};
 uint32_t daysForTest = 7;
-bool testStarded = false;
 constexpr uint32_t checkDelay_ms = 1000;
 uint32_t lasCheckTime = 0;
+uint32_t testsCounter = 0;
 
 /* USER CODE END PV */
 
@@ -123,48 +123,29 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if(sysDate.Date > bq.m_sysData.testCyclePeriod_days && !testStarded) {
-      if(bq.gaugeControlSubCmnd(bq34110::subcmnd::ACCUM_RESET)) {
-        bq.updBatCondData();
-        //@TODO: If BATLOW, not starting test
-//        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //DRAINING LOAD ON
-        if (!bq.gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_ON)) {
-          testStarded = false;
-          return 0;
+    if (bq.isVoltNorm()) {
+      if(sysDate.Date > bq.m_sysData.testCyclePeriod_days ||
+          testsCounter == 0 && !bq.isTestStarted()) {
+          bq.startTest();
+          sysTime = {0};
+          sysDate = {0};
+          HAL_RTC_SetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
+          HAL_RTC_SetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
         }
-        testStarded = true;
-        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //OUTPUT PIN HIGH, TEST IS GOING  //for tests LED selected
-        sysTime = {0};
-        sysDate = {0};
-        HAL_RTC_SetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
-        HAL_RTC_SetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
       }
-    }
-    if(testStarded && (HAL_GetTick() - lasCheckTime > checkDelay_ms)) {
-      bq.updBatCondData();
-      HAL_Delay(200);
-      bq.updBatStatus();
-    }
-	if (testStarded && (bq.m_batCond.acummCharge > bq.m_sysData.Capacity * 100 / bq.m_sysData.lowCapAlert_prct)) {
-      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
-	  HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
-	}
-    if (bq.m_batStatus.SOCLow && testStarded) {
-      if (!bq.gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF)) {
-        testStarded = false;
-        return 0;
+      if(bq.isTestStarted() && (HAL_GetTick() - lasCheckTime > checkDelay_ms)) {
+        bq.updBatCondData();
+        HAL_Delay(200);
+        bq.updBatStatus();
+        bq.checkTestCondition(testsCounter);
       }
-//      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
-      HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
-      if(bq.m_batCond.acummCharge < bq.m_sysData.Capacity * 100 / bq.m_sysData.lowCapAlert_prct ) {    //in DSG accumCharge is growing (opposite in CHG)
-//        HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //ALERT OF LOW CAPACITY
-      }
-    }
+
     //for testing
-    if (gpioFlag == 1) {
-      bq.m_sysData.testCyclePeriod_days = 0;
-      gpioFlag = 0;
-    }
+      if (gpioFlag == 1) {
+        bq.m_sysData.testCyclePeriod_days = 0;
+        gpioFlag = 0;
+      }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

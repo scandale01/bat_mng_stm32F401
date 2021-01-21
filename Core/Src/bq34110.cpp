@@ -678,32 +678,32 @@ namespace bq34110 {
     }
     void bq34::updBatCondData() {
       uint16_t tmp;
-      if (!this->getStdCommandData(bq34110::cmnd::VOLT, tmp)) {
+      if (!getStdCommandData(bq34110::cmnd::VOLT, tmp)) {
         m_batCond.voltage = 0xFFFF;
       }
       m_batCond.voltage = tmp;
-      if (!this->getStdCommandData(bq34110::cmnd::Current, tmp)) {
+      if (!getStdCommandData(bq34110::cmnd::Current, tmp)) {
         m_batCond.current = 0xFFFF;
       }
       m_batCond.current = tmp * m_sysData.capScale;
-      if (!this->getStdCommandData(bq34110::cmnd::RC, tmp)) {
+      if (!getStdCommandData(bq34110::cmnd::RC, tmp)) {
         m_batCond.remCap = 0xFFFF;
       }
       m_batCond.remCap = tmp * m_sysData.capScale;
-      if (!this->getStdCommandData(bq34110::cmnd::FCC, tmp)) {
+      if (!getStdCommandData(bq34110::cmnd::FCC, tmp)) {
         m_batCond.fullChgCap = 0xFFFF;
       }
       m_batCond.fullChgCap = tmp * m_sysData.capScale;
-      if (!this->getStdCommandData(bq34110::cmnd::ACCCHAR, tmp)) {
+      if (!getStdCommandData(bq34110::cmnd::ACCCHAR, tmp)) {
         m_batCond.acummCharge = 0xFFFF;
       }
       m_batCond.acummCharge = tmp * m_sysData.capScale;
     }
 
   bool bq34::isVoltNorm() {
-    uint16_t voltage = 0;
-    if (getStdCommandData(bq34110::cmnd::VOLT, voltage)) {
-      if (voltage < m_sysData.Voltage) {
+    uint16_t voltage_mV = 0;
+    if (getStdCommandData(bq34110::cmnd::VOLT, voltage_mV)) {
+      if (voltage_mV / m_sysData.CellNumber < 2250) {
         return false;
       }
       return true;

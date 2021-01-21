@@ -124,8 +124,8 @@ int main(void)
   while (1)
   {
     if (bq.isVoltNorm()) {
-      if(sysDate.Date > bq.m_sysData.testCyclePeriod_days ||
-          testsCounter == 0 && !bq.isTestStarted()) {
+      if((sysDate.Date > bq.m_sysData.testCyclePeriod_days ||
+          testsCounter == 0) && !bq.isTestStarted()) {
           bq.startTest();
           sysTime = {0};
           sysDate = {0};

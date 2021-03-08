@@ -1,5 +1,7 @@
 #include "bq34110.h"
+#include "adc.h"
 #include "stdint.h"
+#include "time.h"
 #include "i2c.h"
 #include "stdio.h"
 #include <bitset>
@@ -37,12 +39,19 @@ namespace bq34110 {
       m_sysData.Capacity = 8500; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
       m_sysData.testCyclePeriod_days = 60 ; //60 days test period
 
-      //Read GPIO for configuation setup
-      /*
-      if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
+      HAL_ADC_Start(&hadc1);
+
+      while(HAL_ADC_PollForConversion(&hadc1, 10000)!= HAL_OK);
+      uint32_t adcVal = HAL_ADC_GetValue(hadc1);
+      float voltage = (3.3f*adcVal / 4095) * (6000/(6000 + 54000));
+      if(voltage > 40){
         m_sysData.Voltage = 48;
         m_sysData.CellNumber = 12 + 12;
+        HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+        __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 500);
       }
+      //Read GPIO for configuation setup
+      /*
       if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
         m_sysData.Capacity = 9000; // nex st
       }
@@ -539,10 +548,10 @@ namespace bq34110 {
       data[1] = 0x0B; //ACDSG_EN=1, ACCHG_EN=1, IGNORE_SD_EN, EOS_EN=1, PCTL_DIS, LF_DIS, WHR_DIS
       if(!this->gaugeWriteDataClass(0x40D7, data, sizeof(data)))
         return false;
-      if (!this->CEDVConfig()) {
+      if (!CEDVConfig()) {
         return false;
       }
-      this->updBatCondData();
+      updBatCondData();
       //@TODO init gas gauge config (when it understand voltage lvl) and safety levels
 
       return true;

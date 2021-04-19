@@ -19,8 +19,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "adc.h"
 #include "i2c.h"
 #include "rtc.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -101,6 +103,8 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   MX_RTC_Init();
+  MX_ADC1_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 //  bq.enterCalMode();
 //  if(!bq.calibRawCurr(calibCurtVal)) {
@@ -126,19 +130,20 @@ int main(void)
     if (bq.isVoltNorm()) {
       if((sysDate.Date > bq.m_sysData.testCyclePeriod_days ||
           testsCounter == 0) && !bq.isTestStarted()) {
+        //@TODO Add relaxation pause before discharge
           bq.startTest();
           sysTime = {0};
           sysDate = {0};
           HAL_RTC_SetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
           HAL_RTC_SetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
         }
-      }
-      if(bq.isTestStarted() && (HAL_GetTick() - lasCheckTime > checkDelay_ms)) {
-        bq.updBatCondData();
-        HAL_Delay(200);
-        bq.updBatStatus();
-        bq.checkTestCondition(testsCounter);
-      }
+    }
+    if(bq.isTestStarted() && (HAL_GetTick() - lasCheckTime > checkDelay_ms)) {
+      bq.updBatCondData();
+      HAL_Delay(200);
+      bq.updBatStatus();
+      bq.checkTestCondition(testsCounter);
+    }
 
     //for testing
       if (gpioFlag == 1) {

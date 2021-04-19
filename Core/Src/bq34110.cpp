@@ -1,7 +1,7 @@
 #include "bq34110.h"
 #include "adc.h"
 #include "stdint.h"
-#include "time.h"
+#include "tim.h"
 #include "i2c.h"
 #include "stdio.h"
 #include <bitset>
@@ -38,11 +38,12 @@ namespace bq34110 {
       m_sysData.CellNumber = 12;  //default value for system voltage
       m_sysData.Capacity = 8500; //17 Ah with a scale of 2 (capScale) 17/18/24/28/40/60 Ah
       m_sysData.testCyclePeriod_days = 60 ; //60 days test period
+      m_sysData.lowCapAlert_prct = 40;
 
       HAL_ADC_Start(&hadc1);
 
       while(HAL_ADC_PollForConversion(&hadc1, 10000)!= HAL_OK);
-      uint32_t adcVal = HAL_ADC_GetValue(hadc1);
+      uint32_t adcVal = HAL_ADC_GetValue(&hadc1);
       float voltage = (3.3f*adcVal / 4095) * (6000/(6000 + 54000));
       if(voltage > 40){
         m_sysData.Voltage = 48;
@@ -62,6 +63,7 @@ namespace bq34110 {
       */
       unseal();
       init();
+      gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF);
     }
 
     bool bq34::getStdCommandData(uint8_t cmnCode, uint16_t& data)
@@ -142,7 +144,7 @@ namespace bq34110 {
      *
      * To change parameters, first identify the data class (also called subclass) from the TRM.
      */
-    bool bq34::gaugeWriteDataClass(uint16_t subClass, uint8_t *pData, uint8_t dataLen)
+    bool bq34::gaugeWriteDataClass(const uint16_t subClass, const uint8_t *pData, uint8_t dataLen)
     {
       uint8_t *data = new uint8_t[3 + dataLen];
       data[0] = bq34110::cmnd::MAC;
@@ -467,6 +469,16 @@ namespace bq34110 {
         return false;
 
       /*
+       * Config for initial capacity
+       * CEDV Profile -> Design Capacity mAh = m_sysData.CellNumber
+       */
+      uint8_t bqDesignCapacity[2];
+      bqDesignCapacity[0] = (m_sysData.Capacity/2) >> 8; //High byte first
+      bqDesignCapacity[1] = m_sysData.Capacity/2;
+      if(!this->gaugeWriteDataClass(0x41FD, bqDesignCapacity, sizeof(bqDesignCapacity)))
+          return false;
+
+      /*
        * Config. for battery status flag setings
        * FCSETVCT = 1  Enables BatteryStatus()[FC] flag set on primary charge termination
        * TCSETV = 1 Enables BatteryStatus()[TCA] flag set when Voltage() ≥ TC:Set Voltage Threshold
@@ -516,8 +528,7 @@ namespace bq34110 {
       if (!this->operationConfigA()) {
         return false;
       }
-      uint8_t numOfSeriesCells = m_sysData.CellNumber;
-      if(!this->gaugeWriteDataClass(0x4155, &numOfSeriesCells, sizeof(numOfSeriesCells)))
+      if(!this->gaugeWriteDataClass(0x4155, &m_sysData.CellNumber, sizeof(m_sysData.CellNumber)))
         return false;
 
       uint8_t flashUpdateOkVoltage[2]; //500 mV
@@ -725,26 +736,27 @@ namespace bq34110 {
       updBatCondData();
 //    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //DRAINING LOAD ON
       if (!gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_ON)) { //for test at home ONLY
-        m_testStarded = false;
+        m_batStatus.testStarded = false;
         return;
       }
-      m_testStarded = true;
+      m_batStatus.testStarded = true;
       HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); //OUTPUT PIN HIGH, TEST IS GOING  //for tests LED selected
     }
   }
 
   void bq34::checkTestCondition(uint32_t& cntr){
-    if (m_testStarded && (m_batCond.acummCharge * 100 / m_sysData.Capacity) > m_sysData.lowCapAlert_prct) {
-      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); // DRAINING LOAD OFF
-      gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF);// for test at home ONLY
-      HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); // OUTPUT PIN LOW, TEST IS NOT-GOING
+    if (m_batStatus.testStarded && (m_batCond.acummCharge * 100 / m_sysData.Capacity) > m_sysData.lowCapAlert_prct) {
+//      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET); // DRAINING LOAD OFF
+gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF);// for test at home ONLY
+//      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET); // OUTPUT PIN LOW, TEST IS NOT-GOING
       cntr++;
-      m_testStarded = false;
-    } else if (m_batStatus.SOCLow && m_testStarded) {
+      m_batStatus.testStarded = false;
+    } else if (m_batStatus.SOCLow && m_batStatus.testStarded) {
       //HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_RESET); //DRAINING LOAD OFF
-//      m_testStarded = false;
-      if (!gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF)) { //for test at home ONLY
-        m_testStarded = false;
+//      m_batStatus.testStarded = false;
+      if (gaugeControlSubCmnd(bq34110::subcmnd::EOS_LOAD_OFF)) { //for test at home ONLY
+        m_batStatus.testStarded = false;
+        //HAL_GPIO_WritePin(GPIOx, GPIO_Pin, GPIO_PIN_SET); //ALERT OF LOW CAPACITY
       }
       HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET); //OUTPUT PIN LOW, TEST IS NOT-GOING
       if(m_batCond.acummCharge * 100 / m_sysData.Capacity < m_sysData.lowCapAlert_prct) {    //in DSG accumCharge is growing (opposite in CHG)
@@ -754,7 +766,7 @@ namespace bq34110 {
   }
 
   bool bq34::isTestStarted(){
-    return m_testStarded;
+    return m_batStatus.testStarded;
   }
 
 }

@@ -76,21 +76,22 @@ namespace bq34110 {
     class bq34 {
       public:
         struct batteryStatus {
-          bool dsgIDetect; //Discharge current detection
-          bool chgIDetect; //Charge current detection
+          bool dsgIDetect;        //Discharge current detection
+          bool chgIDetect;        //Charge current detection
           bool dsgAlarmTerminate; //Terminate Discharge Alarm,  flag is set and cleared based on the selected SOC Flag Config A options
           bool chgAlarmTerminate; //Terminate Charge Alarm, SOC Flag Config A options
-          bool fullCharge; //Full charge is detected ( bit is controlled by settings in SOC Flag Config A and SOC Flag Config B)
-          bool fullDischarge; //Full discharge is detected (based on the selected SOC Flag Config B options)
-          bool chgInhibit; //If set, this indicates charging should not begin because Temperature() is outside the acceptable range
-          bool sleep; //The device is in SLEEP mode when set.
-          bool batLow; //Battery Low Voltage Alarm (based on the selected thresholds in Safety.BATLOW data flash)
-          bool batHigh; // Battery High Voltage Alarm (based on the selected thresholds in Safety.BATLOW data flash)
+          bool fullCharge;        //Full charge is detected ( bit is controlled by settings in SOC Flag Config A and SOC Flag Config B)
+          bool fullDischarge;     //Full discharge is detected (based on the selected SOC Flag Config B options)
+          bool chgInhibit;        //If set, this indicates charging should not begin because Temperature() is outside the acceptable range
+          bool sleep;             //The device is in SLEEP mode when set.
+          bool batLow;            //Battery Low Voltage Alarm (based on the selected thresholds in Safety.BATLOW data flash)
+          bool batHigh;           // Battery High Voltage Alarm (based on the selected thresholds in Safety.BATLOW data flash)
           bool overTmpInDsgMode; // Overtemperature in Discharge condition is detected
           bool overTmpInChgMode; //Overtemperature in Charge condition is detected.
           bool lowTmpInDsgMode;
           bool lowTmpInChgMode;
-          bool SOCLow;          //State-Of-Charge low detection
+          bool SOCLow;            //State-Of-Charge low detection
+          bool testStarded;
         };
         struct batteryCondition {
           uint16_t voltage;
@@ -116,7 +117,7 @@ namespace bq34110 {
         bool gaugeControlSubCmnd (uint16_t subCmnd);
         bool reset();
         bool gaugeReadDataClass(uint8_t subClass, uint8_t *pData, uint8_t dataLen);
-        bool gaugeWriteDataClass(uint16_t subClass, uint8_t *pData, uint8_t dataLen);
+        bool gaugeWriteDataClass(const uint16_t subClass, const uint8_t *pData, uint8_t dataLen);
         bool gaugeWriteDataClass(uint16_t subClass, int8_t *pData, uint8_t dataLen);
         bool operationConfigA();
         bool CEDVConfig();

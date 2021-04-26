@@ -470,13 +470,26 @@ namespace bq34110 {
 
       /*
        * Config for initial capacity
-       * CEDV Profile -> Design Capacity mAh = m_sysData.CellNumber
+       * CEDV Profile -> Design Capacity mAh
+       * This is intended to be the theoretical
+       * or nominal capacity of a new pack in units of 1 mAh per LSB, and is
+       * used for the calculation of StateOfHealth().
        */
       uint8_t bqDesignCapacity[2];
       bqDesignCapacity[0] = (m_sysData.Capacity/2) >> 8; //High byte first
       bqDesignCapacity[1] = m_sysData.Capacity/2;
-      if(!this->gaugeWriteDataClass(0x41FD, bqDesignCapacity, sizeof(bqDesignCapacity)))
-          return false;
+      if(!this->gaugeWriteDataClass(0x41F5, bqDesignCapacity, sizeof(bqDesignCapacity)))
+        return false;
+
+      /*
+       * Learned Full Charge Capacity
+       * Gas Gauging -> State Profile > Learned Full Charge Capacity mAh
+       */
+      uint8_t bqLearnFullChargeCapacity[2];
+      bqDesignCapacity[0] = (m_sysData.Capacity/2) >> 8; //High byte first
+      bqDesignCapacity[1] = m_sysData.Capacity/2;
+      if(!this->gaugeWriteDataClass(0x40C0, bqLearnFullChargeCapacity, sizeof(bqDesignCapacity)))
+        return false;
 
       /*
        * Config. for battery status flag setings
@@ -629,6 +642,85 @@ namespace bq34110 {
       return true;
     }
 
+    void bq34::EOSStatus() {
+      uint16_t tmp = 0;
+      if(!this->getStdCommandData(bq34110::cmnd::EOSSTAT, tmp))
+        return;
+      std::bitset<16> bset(tmp);
+    }
+
+    void bq34::EOSLearnStatus() {
+      uint16_t tmp = 0;
+      if(!this->getStdCommandData(bq34110::cmnd::EOSLERNSTAT, tmp))
+        return;
+      std::bitset<16> bset(tmp);
+      if (bset.test(0)) {
+        m_EOSLernStatus.ldsg = true;
+      } else
+        m_EOSLernStatus.ldsg = false;
+      if (bset.test(1)) {
+        m_EOSLernStatus.lchg = true;
+      } else
+        m_EOSLernStatus.lchg = false;
+      if (bset.test(2)) {
+        m_EOSLernStatus.lrlx = true;
+      } else
+        m_EOSLernStatus.lrlx = false;
+      if (bset.test(3)) {
+        m_EOSLernStatus.lper = true;
+      } else
+        m_EOSLernStatus.lper = false;
+      if (bset.test(4)) {
+        m_EOSLernStatus.lcmd = true;
+      } else
+        m_EOSLernStatus.lcmd = false;
+      if (bset.test(5)) {
+        m_EOSLernStatus.labrt = true;
+      } else
+        m_EOSLernStatus.labrt = false;
+      if (bset.test(6)) {
+        m_EOSLernStatus.lfault = true;
+      } else
+        m_EOSLernStatus.lfault = false;
+      if (bset.test(7)) {
+        m_EOSLernStatus.lcto = true;
+      } else
+        m_EOSLernStatus.lcto = false;
+      if (bset.test(8)) {
+        m_EOSLernStatus.ldpai = true;
+      } else
+        m_EOSLernStatus.ldpai = false;
+      if (bset.test(9)) {
+        m_EOSLernStatus.ldpat = true;
+      } else
+        m_EOSLernStatus.ldpat = false;
+      if (bset.test(10)) {
+        m_EOSLernStatus.ldpam = true;
+      } else
+        m_EOSLernStatus.ldpam = false;
+      if (bset.test(11)) {
+        m_EOSLernStatus.lucd = true;
+      } else
+        m_EOSLernStatus.lucd = false;
+      if (bset.test(12)) {
+        m_EOSLernStatus.lctledge = true;
+      } else
+        m_EOSLernStatus.lctledge = false;
+      if (bset.test(13)) {
+        m_EOSLernStatus.lrstor = true;
+      } else
+        m_EOSLernStatus.lrstor = false;
+      if (bset.test(14)) {
+        m_EOSLernStatus.lres = true;
+      } else
+        m_EOSLernStatus.lres = false;
+      if (bset.test(15)) {
+        m_EOSLernStatus.ldone = true;
+      } else
+        m_EOSLernStatus.ldone = false;
+      return;
+    }
+
     void bq34::updBatStatus() {
       uint16_t tmp = 0;
       if(!this->getStdCommandData(bq34110::cmnd::BSTAT, tmp))
@@ -723,7 +815,7 @@ namespace bq34110 {
   bool bq34::isVoltNorm() {
     uint16_t voltage_mV = 0;
     if (getStdCommandData(bq34110::cmnd::VOLT, voltage_mV)) {
-      if (voltage_mV / m_sysData.CellNumber < 2250) {
+      if (voltage_mV < 27000) {
         return false;
       }
       return true;

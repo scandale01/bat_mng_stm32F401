@@ -5,6 +5,25 @@
 namespace bq34110 {
     constexpr int8_t selfAddress = 0xAA;
 
+    struct eosLearnStatus {
+      bool lcto; //Learn charge time out
+      bool lfault; // Learn fault flag
+      bool labrt; //Learn abort on command
+      bool lcmd; //Learn command
+      bool lper; // LEarn periodic mode
+      bool lrlx; // Learn RELAX mode
+      bool lchg; //Learn CHARGE mode
+      bool ldsg; //Learn DISCHARGE mode
+      bool ldone; //learn done
+      bool lres; //Learned Rcell
+      bool lrstor; // Learn Voltage Restore
+      bool lctledge; //Learn Discharge Flag Edge Detected
+      bool lucd; //Learn Unexpected Current Detected
+      bool ldpam; //Learn Discharge Phase, Abort on Timer
+      bool ldpat; //Learn Discharge Phase, Abort on Temperature
+      bool ldpai; //Learn Discharge Phase, abort on current
+    };
+
     namespace cmnd {
         constexpr uint8_t CNTRL = 0x00;       //0x00 and 0x01, unit NA (access R/W)
         constexpr uint8_t TEMP = 0x06;        //0x06 and 0x07, unit 0.1K (access R)
@@ -40,6 +59,7 @@ namespace bq34110 {
         constexpr uint8_t RAW_VOLTAGE = 0x7C;     //reads voltage at calibration
         constexpr uint8_t RAW_TEMP = 0x7E;        //reads temperature at calibration
     }
+
     namespace subcmnd{
          constexpr uint16_t CONTROL_STATUS = 0x0000;    //Reports the status of key features. This command should be 
                                                         // read back on 0x00; it will not read back on MACData().
@@ -71,8 +91,8 @@ namespace bq34110 {
          constexpr uint16_t OPERAT_STATUS = 0x0054;          //This returns the same value as the OperationStatus() command
          constexpr uint16_t GAUGING_STATUS = 0x0056;        //This MAC subcommand returns the information in the CEDV gauging status register
          constexpr uint16_t MANUFACT_STATUS = 0x0057;       //This MAC subcommand returns the values of various functional modes of the device
-
     }
+
     class bq34 {
       public:
         struct batteryStatus {
@@ -93,6 +113,7 @@ namespace bq34110 {
           bool SOCLow;            //State-Of-Charge low detection
           bool testStarded;
         };
+
         struct batteryCondition {
           uint16_t voltage;
           uint16_t current;
@@ -100,6 +121,7 @@ namespace bq34110 {
           uint16_t fullChgCap;
           uint32_t acummCharge;
         };
+
         struct sysParameters {
           uint8_t capScale ; //this scale % DOD voltage in 2 times
           uint8_t Voltage;  //default value for system voltage
@@ -110,7 +132,6 @@ namespace bq34110 {
           uint16_t testCyclePeriod_days;
         };
 
-      public:
         bq34();
         bool getStdCommandData(uint8_t cmnCode, uint16_t& data);
         bool getSubCommandData(uint8_t WCmnCode, uint16_t subCmnd, uint8_t RCmndCode, uint16_t& data);
@@ -127,6 +148,8 @@ namespace bq34110 {
         bool calibBoardOffset();
         bool calibRawCurr(uint16_t &currentVal);
         bool calibRawVoltage(uint16_t &voltagetVal);
+        void EOSLearnStatus();
+        void EOSStatus();
         void updBatStatus();
         void updBatCondData();
         bool isVoltNorm();
@@ -143,7 +166,8 @@ namespace bq34110 {
         bool gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen);
         bool gaugeWrite(uint8_t *pData, uint8_t dataLen);
         bool unseal();
-        bool m_testStarded = false;
+        eosLearnStatus m_EOSLernStatus;
+
     };
 
 }

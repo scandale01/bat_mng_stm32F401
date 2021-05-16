@@ -16,7 +16,8 @@ namespace bq34110 {
       bool ldsg; //Learn DISCHARGE mode
       bool ldone; //learn done
       bool lres; //Learned Rcell
-      bool lrstor; // Learn Voltage Restore
+      bool lrstor; // Learn Voltage Restore. This bit is set = 1 if whenever the Learn Discharge Phase is complete and the voltage can be
+                  //restored back to its original level. This bit is cleared when the learning phase is complete.
       bool lctledge; //Learn Discharge Flag Edge Detected
       bool lucd; //Learn Unexpected Current Detected
       bool ldpam; //Learn Discharge Phase, Abort on Timer
@@ -148,8 +149,8 @@ namespace bq34110 {
         bool calibBoardOffset();
         bool calibRawCurr(uint16_t &currentVal);
         bool calibRawVoltage(uint16_t &voltagetVal);
-        void EOSLearnStatus();
-        void EOSStatus();
+        void updEOSLearnStatus();
+        void getEOSStatus();
         void updBatStatus();
         void updBatCondData();
         bool isVoltNorm();

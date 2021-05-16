@@ -40,6 +40,8 @@ namespace bq34110 {
       m_sysData.testCyclePeriod_days = 60 ; //60 days test period
       m_sysData.lowCapAlert_prct = 40;
 
+      m_batStatus.testStarded = false;
+
       HAL_ADC_Start(&hadc1);
 
       while(HAL_ADC_PollForConversion(&hadc1, 10000)!= HAL_OK);
@@ -356,7 +358,7 @@ namespace bq34110 {
         rawDataSum += tempCurr;
         counterPrev = counterNow;
       }
-      currentVal = (rawDataSum / 10) / m_sysData.capScale;
+      currentVal = (rawDataSum / 10) / m_sysData.capScale; //@TODO smth wrong there, capScale ??
       return true;
     }
 
@@ -514,6 +516,14 @@ namespace bq34110 {
       uint8_t socFlagConfB = 0x33;
       if(!this->gaugeWriteDataClass(0x41FF, &socFlagConfB, sizeof(socFlagConfB)))
         return false;
+      /*
+       * LENCTL = 1 -  The LEN pin is used to control Learn Discharge Current.
+       * LSM = 1 -  DISCHARGE-BEFORE-CHARGE mode is used.
+       * LVR = 0 - The device stops Learn Discharge Phase when the timer reaches Learn Discharge Time
+       */
+      uint8_t EOSConfiguration = 0x03;
+      if(!this->gaugeWriteDataClass(0x4218, &EOSConfiguration, sizeof(EOSConfiguration)))
+          return false;
 
       /*
        * The user can set thresholds to alert the host when AccumulatedCharge() reaches a particular level in both
@@ -642,18 +652,23 @@ namespace bq34110 {
       return true;
     }
 
-    void bq34::EOSStatus() {
-      uint16_t tmp = 0;
-      if(!this->getStdCommandData(bq34110::cmnd::EOSSTAT, tmp))
-        return;
-      std::bitset<16> bset(tmp);
-    }
-
-    void bq34::EOSLearnStatus() {
+    void bq34::updEOSLearnStatus() {
       uint16_t tmp = 0;
       if(!this->getStdCommandData(bq34110::cmnd::EOSLERNSTAT, tmp))
         return;
       std::bitset<16> bset(tmp);
+      bool *pTestLast = &m_EOSLernStatus.lcto;
+      bool *pTestFirst = &m_EOSLernStatus.ldpai;
+      bool *pStruct = (bool*)&m_EOSLernStatus;
+      for(uint32_t i = sizeof(m_EOSLernStatus)-1; i>=0; i--) {
+        if (bset.test(i)) {
+          *pStruct = true;
+        } else {
+          *pStruct = false;
+        }
+      ++pStruct;
+      }
+/*
       if (bset.test(0)) {
         m_EOSLernStatus.ldsg = true;
       } else
@@ -718,6 +733,7 @@ namespace bq34110 {
         m_EOSLernStatus.ldone = true;
       } else
         m_EOSLernStatus.ldone = false;
+*/
       return;
     }
 

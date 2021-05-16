@@ -144,6 +144,7 @@ int main(void)
       bq.updBatStatus();
       bq.checkTestCondition(testsCounter);
     }
+//    bq.updEOSLearnStatus();
 
     //for testing
       if (gpioFlag == 1) {

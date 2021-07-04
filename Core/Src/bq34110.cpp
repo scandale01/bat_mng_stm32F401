@@ -86,7 +86,7 @@ namespace bq34110 {
         i2c_data[0] = WCmnCode;
         i2c_data[1] = subCmnd;
         i2c_data[2] = 0xFF & subCmnd >> 8;
-        if(HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), i2c_data, sizeof(i2c_data), 100) != HAL_OK)
+        if(HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), (uint8_t*)i2c_data, sizeof(i2c_data), 100) != HAL_OK)
           return false;
         HAL_Delay(1500);
         return this->getStdCommandData(RCmndCode, data);
@@ -395,10 +395,10 @@ namespace bq34110 {
     bool bq34::gaugeRead(uint8_t cmnd, uint8_t *pData, uint8_t dataLen)
     {
       uint8_t cmndDat= cmnd;
-      if (HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), &cmndDat, sizeof(cmnd), 100) != HAL_OK) {
+      if (HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), (uint8_t*)&cmndDat, sizeof(cmnd), 500) != HAL_OK) {
         return false;
       }
-      if (HAL_I2C_Master_Receive(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), pData, dataLen, 1500) != HAL_OK) {
+      if (HAL_I2C_Master_Receive(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), pData, dataLen, 800) != HAL_OK) {
         return false;
       } else
         return true;
@@ -406,7 +406,7 @@ namespace bq34110 {
 
     bool bq34::gaugeWrite(uint8_t *pData, uint8_t dataLen)
     {
-      if (HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), pData, dataLen, 10) != HAL_OK)
+      if (HAL_I2C_Master_Transmit(&hi2c1, static_cast<uint16_t>(bq34110::selfAddress), (uint8_t*)pData, dataLen, 500) != HAL_OK)
       {
         return false;
       } else {
@@ -837,6 +837,14 @@ namespace bq34110 {
       return true;
     }
     return false;
+  }
+
+  uint32_t bq34::getVoltage() {
+    uint16_t voltage_mV = 0;
+    if (getStdCommandData(bq34110::cmnd::VOLT, voltage_mV)) {
+      return voltage_mV;
+    }
+    return 9999;
   }
 
   void bq34::startTest(){

@@ -154,6 +154,7 @@ namespace bq34110 {
         void updBatStatus();
         void updBatCondData();
         bool isVoltNorm();
+        uint32_t getVoltage();
         void startTest();
         void checkTestCondition(uint32_t& cntr);
         bool isTestStarted();

@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "dma.h"
 #include "i2c.h"
 #include "rtc.h"
 #include "tim.h"
@@ -29,6 +30,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bq34110.h"
+extern "C"
+{
+#include "ssd1306.h"
+#include "logger.h"
+}
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,6 +65,10 @@ uint32_t daysForTest = 7;
 constexpr uint32_t checkDelay_ms = 1000;
 uint32_t lasCheckTime = 0;
 uint32_t testsCounter = 0;
+char outputData[15];
+uint32_t lcdUpdateTime = 0;
+#define LOGGER_ENABLE 1
+static uint32_t time;
 
 /* USER CODE END PV */
 
@@ -100,12 +111,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   MX_RTC_Init();
   MX_ADC1_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  logInit(LOG_INFO);
 //  bq.enterCalMode();
 //  if(!bq.calibRawCurr(calibCurtVal)) {
 ////    Error_Handler();
@@ -116,10 +129,14 @@ int main(void)
 //  }
 //  bq.exitCalMode();
   bq34110::bq34 bq;
+  ssd1306_Init(&hi2c1);
 
+  HAL_Delay(1000);
 
   HAL_RTC_GetTime(&hrtc, &sysTime, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(&hrtc, &sysDate, RTC_FORMAT_BIN);
+  ssd1306_Fill(Black);
+  ssd1306_UpdateScreen(&hi2c1);
 
   /* USER CODE END 2 */
 
@@ -127,7 +144,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if (bq.isVoltNorm()) {
+    if (bq.isVoltNorm() && !bq.m_batStatus.SOCLow) {
       if((sysDate.Date > bq.m_sysData.testCyclePeriod_days ||
           testsCounter == 0) && !bq.isTestStarted()) {
         //@TODO Add relaxation pause before discharge
@@ -143,14 +160,39 @@ int main(void)
       HAL_Delay(200);
       bq.updBatStatus();
       bq.checkTestCondition(testsCounter);
+
     }
 //    bq.updEOSLearnStatus();
 
     //for testing
-      if (gpioFlag == 1) {
-        bq.m_sysData.testCyclePeriod_days = 0;
-        gpioFlag = 0;
+    if((HAL_GetTick() - lcdUpdateTime) > 1000) {
+      ssd1306_Fill(Black);
+      ssd1306_UpdateScreen(&hi2c1);
+      ssd1306_SetCursor(0, 0);
+      if(bq.isTestStarted()) {
+        ssd1306_WriteString("Test ON", Font_11x18, White);
+        ssd1306_SetCursor(0, 12);
+        snprintf(outputData, sizeof(outputData), "Cap mAh: %d", bq.m_batCond.acummCharge);
+        ssd1306_WriteString(outputData, Font_7x10, White);
+      } else {
+        ssd1306_WriteString("Test OFF", Font_11x18, White);
+        ssd1306_SetCursor(0, 20);
+        snprintf(outputData, sizeof(outputData), "Voltage: %d", bq.getVoltage());
+        ssd1306_WriteString(outputData, Font_7x10, White);
+        ssd1306_SetCursor(0, 32);
+        if (bq.m_batStatus.SOCLow) {
+          ssd1306_WriteString("SOCLow: True", Font_7x10, White);
+        } else {
+          ssd1306_WriteString("SOCLow: False", Font_7x10, White);
+        }
       }
+      time =HAL_GetTick();
+      ssd1306_UpdateScreen(&hi2c1);
+      lcdUpdateTime = HAL_GetTick();
+      time = lcdUpdateTime - time;
+      logInfo("Update time: %d", lcdUpdateTime-time);
+    }
+    HAL_Delay(100);
 
     /* USER CODE END WHILE */
 

@@ -24,7 +24,6 @@
 #include "i2c.h"
 #include "rtc.h"
 #include "tim.h"
-#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
